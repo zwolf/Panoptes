@@ -27,7 +27,7 @@ class ZooniverseUserSubscription < ActiveRecord::Base
   def self.zoo_project_subscriptions(user_ids)
     query = self.where.not(user_id: nil, project_id: nil)
     query = query.where(user_id: user_ids) if user_ids
-    query
+    query.group(:user_id, :project_id)
   end
 
   def import(index)
@@ -35,10 +35,15 @@ class ZooniverseUserSubscription < ActiveRecord::Base
     zoo_project = find_legacy_migrated_project
     if panoptes_user = find_migrated_user
       migrated_upp = UserProjectPreference.find_or_initialize_by(project_id: zoo_project.id,
-                                                                 user_id: panoptes_user.id)
+        user_id: panoptes_user.id)
       migrated_upp.legacy_count = summate_activity_counts
       migrated_upp.email_communication = (notifications || true)
-      migrated_upp.save! if migrated_upp.changed?
+      if migrated_upp.changed?
+        unless migrated_upp.save
+          p "Failed to save upp for : #{migrated_upp.user.display_name} - #{migrated_upp.project.display_name}"
+          p migrated_upp.errors
+        end
+      end
     end
   end
 
@@ -59,8 +64,10 @@ class ZooniverseUserSubscription < ActiveRecord::Base
   end
 
   def find_migrated_user
-    unless migrated_user = User.find_by(zooniverse_id: user_id)
-      p "Skipping subscription for non-migrated user account: #{zooniverse_user.login}"
+    if migrated_user = User.find_by(zooniverse_id: user_id)
+      p "Importing #{migrated_user.display_name}"
+    else
+      p "Skipping subscription for non-migrated user account: #{user_id}"
     end
     migrated_user
   end
