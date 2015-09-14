@@ -13,7 +13,7 @@ namespace :user_project_preference do
   desc 'import comma seperated list of users project preferences (subscriptions) from Zoo Home'
   task import: :environment do
     users = ENV['USERS'].try(:split, ",")
-    ZooniverseUserSubscription.import_zoo_user_subscriptions(users)
+    ZooniverseUserSubscription.import_subs#(users)
   end
 end
 

@@ -10,9 +10,10 @@ class ZooniverseUserSubscription < ActiveRecord::Base
   belongs_to :zooniverse_user, foreign_key: "user_id"
   serialize :summary, Hash
 
-  def self.import_zoo_user_subscriptions(user_logins=nil)
+  def self.import_subs(user_logins: nil, project_id: nil)
     import_ids = zoo_users_to_import(user_logins)
-    subs = zoo_project_subscriptions(import_ids)
+    subs = zoo_project_subscriptions(import_ids, project_id)
+    p subs
     subs.find_each.with_index(&:import)
   end
 
@@ -24,10 +25,11 @@ class ZooniverseUserSubscription < ActiveRecord::Base
     end
   end
 
-  def self.zoo_project_subscriptions(user_ids)
-    query = self.where.not(user_id: nil, project_id: nil)
+  def self.zoo_project_subscriptions(user_ids, project_id)
+    query = where.not(user_id: nil, project_id: nil)
     query = query.where(user_id: user_ids) if user_ids
-    query.group(:user_id, :project_id)
+    query = query.where(project_id: project_id) if project_id
+    query
   end
 
   def import(index)
@@ -76,13 +78,16 @@ class ZooniverseUserSubscription < ActiveRecord::Base
   # original DB has no validations and there are duplicates with different values
   def summate_activity_counts
     all_user_projects_subscriptions.reduce({}) do |counts, subscription|
-      next if subscription.empty_summary?
-      summary = subscription.summary
-      summary.each do |workflow, value|
-        counts[workflow] ||= 0
-        counts[workflow] += value[:count].to_i
+      if subscription.empty_summary?
+        counts
+      else
+        summary = subscription.summary
+        summary.each do |workflow, value|
+          counts[workflow] ||= 0
+          counts[workflow] += value[:count].to_i
+        end
+        counts
       end
-      counts
     end
   end
 
